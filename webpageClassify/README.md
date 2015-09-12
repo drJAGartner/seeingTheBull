@@ -1,1 +1,1 @@
-Our less than 1 hour game prediction algorythms.
+Code to compare and contrast website content and structure
