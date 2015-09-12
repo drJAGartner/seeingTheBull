@@ -8,6 +8,7 @@ import argparse
 import nflgame as nfl
 
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
