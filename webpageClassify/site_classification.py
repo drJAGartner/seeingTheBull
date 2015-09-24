@@ -15,8 +15,16 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 def url_to_soup(url):
-    response = urllib2.build_opener(urllib2.HTTPCookieProcessor).open(url)
+    hdr = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+   'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+   'Accept-Encoding': 'none',
+   'Accept-Language': 'en-US,en;q=0.8',
+   'Connection': 'keep-alive'}
+    req = urllib2.Request(url,headers=hdr)
+    response = urllib2.build_opener(urllib2.HTTPCookieProcessor).open(req)
     return BeautifulSoup(response.read(), "html.parser")
+
 
 def assign_type(site, link_url):
     # 0 - article
@@ -82,55 +90,76 @@ def paragraph_to_word_list_list(str_in, tokenizer):
 
 def story_stats(site, link_url, tokenizer):
     story_soup = url_to_soup(link_url)
+    l_ret, n_images = [], 0
     if site == "http://fivethirtyeight.com":
-        l_ret = []
-        for par in story_soup.find_all("p"):
+        body_soup = None
+        for div in story_soup.find_all("div"):
+            try:
+                if div['class'][0] == "entry-content":
+                    body_soup = div
+                    break
+            except:
+                continue
+        if body_soup != None:
+            for p in body_soup.find_all('p'):
+                if p.text != None:
+                    l_ret.extend(paragraph_to_word_list_list(p.text, tokenizer))
 
-        return l_ret
     elif site == "http://www.nytimes.com":
-        l_ret = []
         for par in story_soup.find_all("p"):
             if par.find("story-body-text")!=-1 \
-                and par.string != None\
-                and par.string.lower() != 'advertisement':
-                l_ret.extend(paragraph_to_word_list_list(par.string, tokenizer))
-        return l_ret
-    else:
-        return []
+                and par.text != None\
+                and par.text.lower() != 'advertisement':
+                l_ret.extend(paragraph_to_word_list_list(par.text, tokenizer))
+
+    elif site == "http://buzzfeed.com":
+        for d in story_soup.find_all('div'):
+            try:
+                if 'buzz_superlist_item' in d['class']:
+                    l_ret.extend(paragraph_to_word_list_list(d.text, tokenizer))
+                    for img in d.find_all("img"):
+                        try:
+                           if img['class'] == 'bf_dom':
+                               n_images = n_images + 1
+                        except:
+                            continue
+            except:
+                continue
+    return (l_ret, n_images)
 
 if __name__ == "__main__":
-sites = {}
-sites["http://fivethirtyeight.com"] = {}
-#sites["http://www.nytimes.com"] = {}
-#sites["http://buzzfeed.com"] = {}
+    sites = {}
+    sites["http://www.nytimes.com"] = {}
+    sites["http://fivethirtyeight.com"] = {}
+    sites["http://buzzfeed.com"] = {}
 
-tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
+    tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
 
-for site, obj in sites.iteritems():
-    soup = url_to_soup(site)
-    n_external  = 0
-    site_links = set()
-    for link in soup.find_all('a'):
-        link_url = link.get('href')
-        link_type = assign_type(site, link_url)
-        if link_type==0:
-            if site == "http://buzzfeed.com":
-                link_url = "http://buzzfeed.com" + link_url
-            site_links.add(link_url)
-        if link_type==2:
-            n_external = n_external +1
-    obj["links"] = list(site_links)
-    obj["external"] = n_external
+    for site, obj in sites.iteritems():
+        print site
+        soup = url_to_soup(site)
+        n_external  = 0
+        site_links = set()
+        for link in soup.find_all('a'):
+            link_url = link.get('href')
+            link_type = assign_type(site, link_url)
+            if link_type==0:
+                if site == "http://buzzfeed.com":
+                    link_url = "http://buzzfeed.com" + link_url
+                site_links.add(link_url)
+            if link_type==2:
+                n_external = n_external +1
+        obj["links"] = list(site_links)
+        obj["external"] = n_external
 
         l_words = []
         l_num_words = []
         for story in obj["links"]:
-            l_story_words = story_stats(site, story, tokenizer)
+            (l_story_words, n_images) = story_stats(site, story, tokenizer)
             num_words = 0
             for story_words in l_story_words:
                 num_words = num_words + len(story_words)
             l_num_words.append(num_words)
             l_words.extend(l_story_words)
-            print num_words
-            if num_words < 20:
-                print l_story_words
+            print num_words, n_images
+
