@@ -9,6 +9,7 @@ import re
 from bs4 import BeautifulSoup
 import nltk
 
+import numpy as np
 
 import matplotlib
 matplotlib.use('Agg')
@@ -135,6 +136,9 @@ if __name__ == "__main__":
 
     tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
 
+    l_wc = []
+    l_var_wc = []
+
     for site, obj in sites.iteritems():
         print site
         soup = url_to_soup(site)
@@ -159,7 +163,19 @@ if __name__ == "__main__":
             num_words = 0
             for story_words in l_story_words:
                 num_words = num_words + len(story_words)
-            l_num_words.append(num_words)
-            l_words.extend(l_story_words)
-            print num_words, n_images
+            if num_words > 10:
+                l_num_words.append(num_words)
+                l_words.extend(l_story_words)
+
+        l_wc.append(np.array(l_num_words).mean())
+        l_wc.append(np.array(l_num_words).var())
+
+    mPX = range(1, len(sites.keys())+1)
+    plt.xlabel("Website")
+    plt.ylabel("Average Wordcount")
+    ax = plt.subplot()
+    ax.errorbar(mPX,l_wc,xerr=l_var_wc)
+    ax.set_xticks(map(lambda x: x-0.5, mPX))
+    ax.set_xticklabels(sites.keys(),rotation=5)
+    plt.savefig("site_wordcounts.png")
 
