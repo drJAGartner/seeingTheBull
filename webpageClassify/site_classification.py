@@ -8,7 +8,7 @@ import urllib2
 import re
 from bs4 import BeautifulSoup
 import nltk
-
+from math import sqrt
 import numpy as np
 
 import matplotlib
@@ -105,6 +105,12 @@ def story_stats(site, link_url, tokenizer):
             for p in body_soup.find_all('p'):
                 if p.text != None:
                     l_ret.extend(paragraph_to_word_list_list(p.text, tokenizer))
+        for img in story_soup.find_all("img"):
+            try:
+                if len(set(['attachment-banner','size-full','attachment-large']).intersection(img['class']))!=0:
+                    n_images = n_images + 1
+            except:
+                continue
 
     elif site == "http://www.nytimes.com":
         for par in story_soup.find_all("p"):
@@ -112,6 +118,12 @@ def story_stats(site, link_url, tokenizer):
                 and par.text != None\
                 and par.text.lower() != 'advertisement':
                 l_ret.extend(paragraph_to_word_list_list(par.text, tokenizer))
+        for img in story_soup.find_all("img"):
+            try:
+                if len(set(['media-viewer-candidate','artboard']).intersection(img['class']))!=0:
+                    n_images = n_images + 1
+            except:
+                continue
 
     elif site == "http://buzzfeed.com":
         for d in story_soup.find_all('div'):
@@ -120,7 +132,7 @@ def story_stats(site, link_url, tokenizer):
                     l_ret.extend(paragraph_to_word_list_list(d.text, tokenizer))
                     for img in d.find_all("img"):
                         try:
-                           if img['class'] == 'bf_dom':
+                           if 'bf_dom' in img['class']:
                                n_images = n_images + 1
                         except:
                             continue
@@ -138,6 +150,8 @@ if __name__ == "__main__":
 
     l_wc = []
     l_var_wc = []
+    l_wpr = []
+    l_var_wpr = []
 
     for site, obj in sites.iteritems():
         print site
@@ -158,24 +172,35 @@ if __name__ == "__main__":
 
         l_words = []
         l_num_words = []
+        l_words_per_image = []
         for story in obj["links"]:
             (l_story_words, n_images) = story_stats(site, story, tokenizer)
             num_words = 0
             for story_words in l_story_words:
                 num_words = num_words + len(story_words)
-            if num_words > 10:
+            if num_words > 10 and n_images>1:
+                l_words_per_image.append(float(num_words)/float(n_images))
                 l_num_words.append(num_words)
                 l_words.extend(l_story_words)
 
-        l_wc.append(np.array(l_num_words).mean())
-        l_wc.append(np.array(l_num_words).var())
+        arr = np.array(l_num_words)
+        print "Word count: ", arr.mean(),"+/-",arr.std()
+        ar2 = np.array(l_words_per_image)
+        print "Word to picture ration: ", ar2.mean(),"+/-",ar2.std()
+        l_wc.append(arr.mean())
+        l_var_wc.append(arr.std()/sqrt(len(arr)))
+        l_wpr.append(ar2.mean())
+        l_var_wpr.append(ar2.std()/sqrt(len(ar2)))
 
-    mPX = range(1, len(sites.keys())+1)
+    y_labs = ["fivethirtyeight", "buzzfeed", "nytimes"]
+    mPX = np.array(range(1, len(sites.keys())+1))
     plt.xlabel("Website")
-    plt.ylabel("Average Wordcount")
+    plt.ylabel("Average Words per Picture")
+    plt.subplots_adjust(bottom=0.25)
     ax = plt.subplot()
-    ax.errorbar(mPX,l_wc,xerr=l_var_wc)
-    ax.set_xticks(map(lambda x: x-0.5, mPX))
-    ax.set_xticklabels(sites.keys(),rotation=5)
+    ax.errorbar(mPX,np.array(l_wpr),yerr=np.array(l_var_wpr), fmt='o', c='g', ecolor='g')
+    ax.set_xlim(0,4)
+    ax.set_xticks(mPX)
+    ax.set_xticklabels(y_labs,rotation=5)
     plt.savefig("site_wordcounts.png")
 

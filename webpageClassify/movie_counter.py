@@ -1,14 +1,11 @@
 import urllib2
 import re
 from bs4 import BeautifulSoup
-from math import sqrt
-import numpy as np
+
 import codecs
 import json
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+
 
 def url_to_soup(url):
     hdr = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
@@ -27,6 +24,7 @@ def money_to_int(str_gross):
 def process_year_page(year_url):
     max_money = 0
     l_horror_gross = []
+    l_open_month = []
     year_sou = url_to_soup(year_url)
     for row in year_sou.find_all("tr"):
         try:
@@ -50,10 +48,12 @@ def process_year_page(year_url):
                             for move_cell in move_sou.find_all("td"):
                                 if move_cell.text == "Genre: Horror":
                                     b_is_horror = True
+                    if n_cell == 7:
+                        l_open_month = move_cell.text[:move_cell.text.find("/")]
                     n_cell = n_cell + 1
         except:
             continue
-    return (max_money, l_horror_gross)
+    return (max_money, l_horror_gross, l_open_month)
 
 def parse_year(year_front_url):
     year_sou = url_to_soup(year_url)
@@ -65,12 +65,14 @@ def parse_year(year_front_url):
 
     max_gross = 0
     l_horror_gross = []
+    l_open_month = []
     for page in other_pages:
-        (temp_gross, temp_list) = process_year_page(page)
+        (temp_gross, temp_gross_list, temp_date_list) = process_year_page(page)
         if temp_gross != 0: max_gross=temp_gross
-        l_horror_gross.extend(temp_list)
+        l_horror_gross.extend(temp_gross_list)
+        l_open_month.extend(temp_date_list)
 
-    return (max_gross, l_horror_gross)
+    return (max_gross, l_horror_gross, l_open_month)
 
 if __name__ == "__main__":
     base_url = "http://www.boxofficemojo.com/yearly/"
@@ -84,13 +86,15 @@ if __name__ == "__main__":
 
     horror_data = {}
     for year_url in year_links:
-        (max_gross, l_gross)  = parse_year(year_url)
+        (max_gross, l_gross, l_month)  = parse_year(year_url)
         i_yr = year_url.find("yr")
         year = year_url[i_yr+3:i_yr+7]
-        horror_data[year] = {"max":max_gross,"h_gross":l_gross}
+        horror_data[year] = {"max":max_gross,"h_gross":l_gross,"rel_date":l_month}
 
     for k, v in horror_data.iteritems():
         print "***\nYear:",k,"\tMax:",v["max"],"\nHorror Grosses",v["h_gross"]
 
+    # save raw data, plot in a seperate script
     with codecs.open("movieData.json", encoding="utf-8",mode="wb") as fOut:
         json.dump(horror_data, fOut)
+
